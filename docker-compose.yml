@@ -1,0 +1,65 @@
+services:
+  # laravel
+  laravel:
+    build:
+      context: ./backend
+      dockerfile: ../config/laravel/Dockerfile
+    image: laravel/testing
+    container_name: laravel
+    restart: unless-stopped
+    tty: true
+    ports:
+      - "5173:5173"
+    depends_on:
+      - laravel-database
+    environment:
+      SERVICE_NAME: laravel
+      SERVICE_TAGS: dev
+    working_dir: /var/www
+    volumes:
+      - ./backend/:/var/www
+    networks:
+      - laranet
+
+  # Nginx Backend Service
+  laravel-webserver:
+    image: nginx:alpine
+    container_name: nginx-spy-api
+    restart: unless-stopped
+    tty: true
+    ports:
+      - "8085:80"
+    volumes:
+      - ./backend/:/var/www
+      - ./config/nginx/conf.d/:/etc/nginx/conf.d/
+    networks:
+      - laranet
+
+  # Database
+  laravel-database:
+    image: mysql:8.3.0
+    container_name: mysql-spy-api
+    restart: unless-stopped
+    volumes:
+      - dbdata:/var/lib/mysql
+      - ./config/database/my.cnf:/etc/my.cnf
+    environment:
+      MYSQL_DATABASE: laravel
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_PASSWORD: example
+      MYSQL_USER: example
+    ports:
+      - 3306:3306
+    networks:
+      - laranet
+
+
+
+# Docker Network
+networks:
+  laranet:
+    driver: bridge
+
+volumes:
+  dbdata:
+    driver: local
