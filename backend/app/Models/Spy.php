@@ -11,6 +11,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 
 class Spy extends Model
 {
@@ -44,8 +45,8 @@ class Spy extends Model
             ],
             'agency' => 'required|in:CIA,MI6,KGB',
             'country_of_operation' => 'required|string|max:255',
-            'date_of_birth' => 'required|date',
-            'date_of_death' => 'nullable|date|after_or_equal:date_of_birth',
+            'date_of_birth' => 'required|date|before_or_equal:today',
+            'date_of_death' => 'nullable|date|after_or_equal:date_of_birth|before_or_equal:today',
         ];
     }
 
@@ -62,10 +63,12 @@ class Spy extends Model
             'date_of_death' => $date_of_death ? $date_of_death->getValue()->format('Y-m-d') : null,
         ];
 
+        // Run validation
         $validator = Validator::make($data, self::validationRules());
 
+        // If validation fails, throw an exception
         if ($validator->fails()) {
-            throw new \Exception($validator->errors());
+            throw new ValidationException($validator);
         }
 
         // Create the spy record
