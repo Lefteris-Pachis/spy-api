@@ -10,7 +10,11 @@ Route::get('/user', function (Request $request) {
 })->middleware('auth:sanctum');
 
 
-Route::middleware('auth:sanctum')->post('/spies', [SpyController::class, 'store']);
+Route::middleware('auth:sanctum')->group(function () {
+    Route::post('/spies', [SpyController::class, 'store']);
+    Route::middleware('throttle:10,1')->get('/spies/random', [SpyController::class, 'getRandomSpies']);
+    Route::get('/spies', [SpyController::class, 'index']);
+});
 
 Route::middleware('api')->group(function () {
     // User registration
