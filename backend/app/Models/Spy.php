@@ -6,6 +6,7 @@ use App\Domain\ValueObjects\Agency;
 use App\Domain\ValueObjects\DateOfBirth;
 use App\Domain\ValueObjects\DateOfDeath;
 use App\Domain\ValueObjects\Name;
+use App\Events\SpyCreated;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Validator;
@@ -67,6 +68,12 @@ class Spy extends Model
             throw new \Exception($validator->errors());
         }
 
-        return self::create($data);
+        // Create the spy record
+        $spy = self::create($data);
+
+        // Dispatch the SpyCreated event
+        event(new SpyCreated($spy));
+
+        return $spy;
     }
 }
