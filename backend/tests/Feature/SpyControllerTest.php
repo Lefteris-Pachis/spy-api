@@ -241,4 +241,165 @@ class SpyControllerTest extends TestCase
 
         $response->assertStatus(JsonResponse::HTTP_UNAUTHORIZED);
     }
+
+    #[\PHPUnit\Framework\Attributes\Test]
+    public function it_can_list_paginated_spies()
+    {
+        $user = User::factory()->create();
+        $this->actingAs($user);
+
+        Spy::factory()->count(30)->create(); // Creates 30 spies
+
+        $response = $this->getJson('/api/spies?page=1&per_page=10');
+
+        $response->assertStatus(JsonResponse::HTTP_OK)
+            ->assertJsonStructure([
+                'data' => [[
+                    'id',
+                    'name',
+                    'surname',
+                    'agency',
+                    'country_of_operation',
+                    'date_of_birth',
+                    'date_of_death',
+                    'created_at',
+                    'updated_at',
+                ]],
+                'first_page_url',
+                'from',
+                'last_page',
+                'last_page_url',
+                'links',
+                'next_page_url',
+                'path',
+                'per_page',
+                'prev_page_url',
+                'to',
+                'total'
+            ]);
+    }
+
+    #[\PHPUnit\Framework\Attributes\Test]
+    public function it_can_filter_spies_by_name()
+    {
+        $user = User::factory()->create();
+        $this->actingAs($user);
+
+        $spy1 = Spy::factory()->create(['name' => 'James', 'surname' => 'Bond']);
+        Spy::factory()->create(['name' => 'John', 'surname' => 'Doe']);
+
+        $response = $this->getJson('/api/spies?name=James&page=1&per_page=10');
+
+        $response->assertStatus(JsonResponse::HTTP_OK)
+            ->assertJsonFragment(['name' => $spy1->name, 'surname' => $spy1->surname]);
+    }
+
+    #[\PHPUnit\Framework\Attributes\Test]
+    public function it_can_filter_spies_by_surname()
+    {
+        $user = User::factory()->create();
+        $this->actingAs($user);
+
+        $spy1 = Spy::factory()->create(['name' => 'James', 'surname' => 'Bond']);
+        Spy::factory()->create(['name' => 'John', 'surname' => 'Doe']);
+
+        $response = $this->getJson('/api/spies?surname=Bond&page=1&per_page=10');
+
+        $response->assertStatus(JsonResponse::HTTP_OK)
+            ->assertJsonFragment(['name' => $spy1->name, 'surname' => $spy1->surname]);
+    }
+
+    #[\PHPUnit\Framework\Attributes\Test]
+    public function it_can_filter_spies_by_exact_age()
+    {
+        $user = User::factory()->create();
+        $this->actingAs($user);
+
+        Spy::factory()->create(['date_of_birth' => now()->subYears(30)->toDateString()]);
+        Spy::factory()->create(['date_of_birth' => now()->subYears(35)->toDateString()]);
+
+        $response = $this->getJson('/api/spies?age_exact=30&page=1&per_page=10');
+
+        $response->assertStatus(JsonResponse::HTTP_OK)
+            ->assertJsonCount(1, 'data');
+    }
+
+    #[\PHPUnit\Framework\Attributes\Test]
+    public function it_can_filter_spies_by_age_range()
+    {
+        $user = User::factory()->create();
+        $this->actingAs($user);
+
+        // Create spies aged 30 and 31
+        Spy::factory()->create(['date_of_birth' => now()->subYears(30)->toDateString()]); // 30 years old
+        Spy::factory()->create(['date_of_birth' => now()->subYears(31)->toDateString()]); // 31 years old
+        // Create spies that are not in the specified age range
+        Spy::factory()->create(['date_of_birth' => now()->subYears(40)->toDateString()]); // 40 years old
+        Spy::factory()->create(['date_of_birth' => now()->subYears(29)->toDateString()]); // 29 years old
+
+        $response = $this->getJson('/api/spies?age_min=30&age_max=35&page=1&per_page=10');
+
+        $response->assertStatus(JsonResponse::HTTP_OK)
+            ->assertJsonCount(2, 'data'); // Expecting 2 spies: 30 and 31 years old
+    }
+
+    #[\PHPUnit\Framework\Attributes\Test]
+    public function it_can_sort_spies_by_name_and_surname()
+    {
+        $user = User::factory()->create();
+        $this->actingAs($user);
+
+        Spy::factory()->create(['name' => 'Alice', 'surname' => 'Smith']);
+        Spy::factory()->create(['name' => 'Bob', 'surname' => 'Zeta']);
+        Spy::factory()->create(['name' => 'Alice', 'surname' => 'Adams']);
+
+        $response = $this->getJson('/api/spies?sort_by=name,surname&page=1&per_page=10');
+
+        $response->assertStatus(JsonResponse::HTTP_OK);
+
+        // Verify the order of names in the response
+        $spies = $response->json('data');
+        $this->assertEquals('Alice', $spies[0]['name']);
+        $this->assertEquals('Adams', $spies[0]['surname']);
+        $this->assertEquals('Alice', $spies[1]['name']);
+        $this->assertEquals('Smith', $spies[1]['surname']);
+        $this->assertEquals('Bob', $spies[2]['name']);
+        $this->assertEquals('Zeta', $spies[2]['surname']);
+    }
+
+    #[\PHPUnit\Framework\Attributes\Test]
+    public function it_returns_error_for_unsupported_sort_field()
+    {
+        $user = User::factory()->create();
+        $this->actingAs($user);
+
+        $response = $this->getJson('/api/spies?sort_by=unsupported_field&page=1&per_page=10');
+
+        $response->assertStatus(JsonResponse::HTTP_UNPROCESSABLE_ENTITY)
+            ->assertJson(['error' => 'Unsupported sort field: unsupported_field']);
+    }
+
+    #[\PHPUnit\Framework\Attributes\Test]
+    public function it_returns_error_for_invalid_per_page_parameter()
+    {
+        $user = User::factory()->create();
+        $this->actingAs($user);
+
+        $response = $this->getJson('/api/spies?per_page=-1');
+
+        $response->assertStatus(JsonResponse::HTTP_UNPROCESSABLE_ENTITY)
+            ->assertJson(['error' => 'Invalid per_page parameter.']);
+    }
+
+    #[\PHPUnit\Framework\Attributes\Test]
+    public function it_returns_error_for_invalid_age_filter()
+    {
+        $user = User::factory()->create();
+        $this->actingAs($user);
+
+        $response = $this->getJson('/api/spies?age_min=not_an_integer&page=1&per_page=10');
+
+        $response->assertStatus(JsonResponse::HTTP_UNPROCESSABLE_ENTITY)
+            ->assertJsonStructure(['error']);
+    }
 }

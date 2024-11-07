@@ -10,6 +10,7 @@ use App\Models\Spy;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Validation\ValidationException;
 
 class SpyController extends Controller
 {
@@ -27,20 +28,16 @@ class SpyController extends Controller
             : null;
 
         try {
-            // Define validation rules using the model's validation method
-            $validator = Validator::make($request->all(), Spy::validationRules());
-
-            if ($validator->fails()) {
-                return response()->json(['errors' => $validator->errors()], 422);
-            }
-
-            // Create the spy
             $spy = Spy::createSpy($name, $agency, $validatedData['country_of_operation'], $dateOfBirth, $dateOfDeath);
 
             // Return a successful response
             return response()->json(['message' => 'Spy created successfully.', 'spy' => $spy], 201);
         } catch (\Exception $e) {
-            // Handle any exceptions that occur
+            // Handle validation exceptions separately
+            if ($e instanceof ValidationException) {
+                return response()->json(['errors' => $e->validator->errors()], 422);
+            }
+            // Handle general exceptions
             return response()->json(['error' => $e->getMessage()], 400);
         }
     }
@@ -56,6 +53,15 @@ class SpyController extends Controller
 
     public function index(Request $request): JsonResponse
     {
+        $validator = Validator::make($request->all(), [
+            'age_min' => 'nullable|integer|min:0',
+            'age_max' => 'nullable|integer|min:0|gte:age_min',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json(['error' => $validator->errors()], JsonResponse::HTTP_UNPROCESSABLE_ENTITY);
+        }
+
         $query = Spy::query();
 
         // Handle filtering by name or surname
