@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Models\Spy;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\JsonResponse;
@@ -172,5 +173,72 @@ class SpyControllerTest extends TestCase
 
         $response->assertStatus(JsonResponse::HTTP_UNPROCESSABLE_ENTITY)
             ->assertJsonValidationErrors(['country_of_operation']);
+    }
+
+    #[\PHPUnit\Framework\Attributes\Test]
+    public function it_can_get_random_spies()
+    {
+        // Create an authenticated user
+        $user = User::factory()->create();
+
+        // Authenticate the user
+        $this->actingAs($user);
+
+        // Create 10 spies
+        Spy::factory()->count(10)->create();
+
+        // Make the request to get random spies
+        $response = $this->getJson('/api/spies/random');
+
+        // Check the status code and structure of the returned JSON
+        $response->assertStatus(JsonResponse::HTTP_OK)
+            ->assertJsonStructure([
+                '*' => ['name', 'surname', 'agency', 'country_of_operation', 'date_of_birth', 'date_of_death']
+            ]);
+    }
+
+    #[\PHPUnit\Framework\Attributes\Test]
+    public function it_returns_empty_array_when_no_spies_exist()
+    {
+        $user = User::factory()->create();  // Create an authenticated user
+        $this->actingAs($user);              // Authenticate the user
+
+        // Call the endpoint to get random spies when none exist
+        $response = $this->getJson('/api/spies/random');
+
+        // Assert that a successful response is returned and that it is an empty array
+        $response->assertStatus(JsonResponse::HTTP_OK)
+            ->assertJson([]);
+    }
+
+    #[\PHPUnit\Framework\Attributes\Test]
+    public function it_can_get_unique_random_spies()
+    {
+        $user = User::factory()->create(); // Authenticate the user
+        $this->actingAs($user);
+
+        Spy::factory()->count(10)->create(); // Create 10 spies
+
+        $response1 = $this->getJson('/api/spies/random');
+        $response2 = $this->getJson('/api/spies/random');
+
+        // Ensure the responses are not identical (can vary based on deletions or randomness)
+        $this->assertNotEquals($response1->json(), $response2->json());
+    }
+
+    #[\PHPUnit\Framework\Attributes\Test]
+    public function it_cannot_get_spies_if_unauthenticated()
+    {
+        $response = $this->getJson('/api/spies/random');
+
+        $response->assertStatus(JsonResponse::HTTP_UNAUTHORIZED);
+    }
+
+    #[\PHPUnit\Framework\Attributes\Test]
+    public function it_cannot_list_spies_without_authentication()
+    {
+        $response = $this->getJson('/api/spies');
+
+        $response->assertStatus(JsonResponse::HTTP_UNAUTHORIZED);
     }
 }
